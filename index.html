@@ -114,12 +114,22 @@ body{
   flex:none;
 }
 .iconbtn:hover{ transform: translateY(-1px); }
+.iconbtn:active{ transform: scale(.9); }
 .iconbtn svg{ width:18px; height:18px; }
+
+@keyframes riseIn{ from{ opacity:0; transform: translateY(10px); } to{ opacity:1; transform: translateY(0); } }
+#topbar{ animation: riseIn .45s cubic-bezier(.2,.8,.2,1) both; }
+#tabbar{ animation: riseIn .45s cubic-bezier(.2,.8,.2,1) .08s both; }
+#radar-wrap{ animation: riseIn .5s cubic-bezier(.2,.8,.2,1) .04s both; }
 
 /* ---------- views ---------- */
 #views{ flex:1; position:relative; overflow:hidden; }
-.view{ position:absolute; inset:0; display:none; overflow:hidden; }
-.view.active{ display:flex; flex-direction:column; }
+.view{
+  position:absolute; inset:0; overflow:hidden; display:flex; flex-direction:column;
+  opacity:0; transform: translateY(10px); pointer-events:none;
+  transition: opacity .25s ease, transform .25s ease;
+}
+.view.active{ opacity:1; transform:translateY(0); pointer-events:auto; }
 
 /* ---------- radar ---------- */
 #radar-wrap{ flex:1; display:flex; align-items:center; justify-content:center; position:relative; padding:10px; min-height:0; }
@@ -128,12 +138,18 @@ body{
 .ring-label{ fill:var(--ring-label); font-family:var(--font-mono); font-size:9px; }
 .compass-label{ fill:var(--text-2); font-family:var(--font-display); font-size:12px; font-weight:600; }
 .home-dot{ fill:var(--accent-2); }
-.plane-node{ cursor:pointer; }
-.plane-node .glyph{ fill:var(--accent); transition: transform .5s linear; }
+.home-pulse{ fill:none; stroke:var(--accent-2); stroke-width:1; animation: homepulse 2.4s ease-out infinite; }
+@keyframes homepulse{ 0%{ r:3.2; opacity:0.8; } 100%{ r:16; opacity:0; } }
+#radar-sweep{ transform-origin: 150px 150px; animation: sweep-rotate 4s linear infinite; pointer-events:none; }
+@keyframes sweep-rotate{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
+.plane-node{ cursor:pointer; transition: transform 1.6s linear; }
+.plane-node .glyph{ fill:var(--accent); transition: transform .6s ease; }
 .plane-node.selected .glyph{ fill:var(--accent-2); }
-.plane-node.alert .glyph{ fill:var(--accent-2); filter: drop-shadow(0 0 5px rgba(255,0,0,0.55)); }
+.plane-node.alert .glyph{ fill:var(--accent-2); filter: drop-shadow(0 0 5px rgba(255,0,0,0.55)); animation: alertblink 1.1s ease-in-out infinite; }
+@keyframes alertblink{ 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
 .plane-node .label{ fill:var(--text-1); font-family:var(--font-mono); font-size:8.5px; }
-.radar-ring-pulse{ fill:none; stroke:var(--accent-2); stroke-width:1.2; opacity:0.6; }
+.radar-ring-pulse{ fill:none; stroke:var(--accent-2); stroke-width:1.2; opacity:0.6; animation: selectpulse 1.6s ease-out infinite; }
+@keyframes selectpulse{ 0%{ r:6; opacity:0.7; } 100%{ r:16; opacity:0; } }
 
 /* ---------- nearby list under radar ---------- */
 #nearby{ flex:none; max-height:34vh; overflow-y:auto; padding:4px 16px 14px; }
@@ -145,6 +161,7 @@ body{
 }
 .ac-row.active{ border-color: var(--accent-2); }
 .ac-row.active .ac-icon{ color:var(--accent-2); }
+.ac-row:active{ transform: scale(.98); }
 .ac-icon{ width:24px; height:24px; flex:none; color:var(--accent); }
 .ac-icon svg{ width:100%; height:100%; }
 .ac-main{ flex:1; min-width:0; }
@@ -162,7 +179,8 @@ body{
 #hangar-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
 @media(min-width:640px){ #hangar-grid{ grid-template-columns: repeat(3, 1fr); } }
 @media(min-width:960px){ #hangar-grid{ grid-template-columns: repeat(4, 1fr); } }
-.hg-card{ padding:14px; display:flex; flex-direction:column; gap:8px; }
+.hg-card{ padding:14px; display:flex; flex-direction:column; gap:8px; animation: riseIn .35s cubic-bezier(.2,.8,.2,1) both; transition: transform .15s ease; }
+.hg-card:active{ transform: scale(.97); }
 .hg-icon{ width:34px; height:34px; color:var(--accent); }
 .hg-icon svg{ width:100%; height:100%; }
 .hg-type{ font-family:var(--font-display); font-weight:600; font-size:13.5px; }
@@ -170,9 +188,10 @@ body{
 .hg-meta{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-2); margin-top:auto; padding-top:6px; border-top:1px solid var(--glass-border); }
 
 /* ---------- detail HUD card ---------- */
-#overlay-detail{ position:absolute; inset:0; z-index:1100; display:none; align-items:flex-end; justify-content:center; padding:16px; }
-#overlay-detail.show{ display:flex; }
-#detail{ width:100%; max-width:420px; padding:18px 20px; }
+#overlay-detail{ position:absolute; inset:0; z-index:1100; display:flex; align-items:flex-end; justify-content:center; padding:16px; opacity:0; pointer-events:none; transition: opacity .25s ease; }
+#overlay-detail.show{ opacity:1; pointer-events:auto; }
+#detail{ width:100%; max-width:420px; padding:18px 20px; transform: translateY(24px); transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+#overlay-detail.show #detail{ transform: translateY(0); }
 #detail .close{ position:absolute; top:12px; right:12px; }
 #detail .flight{ font-family:var(--font-display); font-size:22px; font-weight:700; }
 #detail .hexline{ font-family:var(--font-mono); font-size:12px; color:var(--text-2); margin-top:2px; }
@@ -187,8 +206,9 @@ body{
 .tab{
   flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;
   padding:9px 0 8px; border-radius:14px; cursor:pointer; color:var(--text-2);
-  transition: background .15s ease, color .15s ease;
+  transition: background .15s ease, color .15s ease, transform .15s ease;
 }
+.tab:active{ transform: scale(.94); }
 .tab svg{ width:21px; height:21px; }
 .tab span{ font-family:var(--font-body); font-size:10.5px; font-weight:600; }
 .tab.active{ color:var(--accent-2); background: var(--glass-bg-strong); }
@@ -196,10 +216,12 @@ body{
 /* ---------- settings modal ---------- */
 #overlay{
   position:absolute; inset:0; background:rgba(0,0,0,0.45); z-index:1200;
-  display:none; align-items:center; justify-content:center; padding:20px;
+  display:flex; align-items:center; justify-content:center; padding:20px;
+  opacity:0; pointer-events:none; transition: opacity .2s ease;
 }
-#overlay.show{ display:flex; }
-#settings{ width:100%; max-width:400px; padding:24px; max-height:88vh; overflow-y:auto; }
+#overlay.show{ opacity:1; pointer-events:auto; }
+#settings{ width:100%; max-width:400px; padding:24px; max-height:88vh; overflow-y:auto; transform: scale(.94); opacity:0; transition: transform .25s cubic-bezier(.2,.8,.2,1), opacity .25s ease; }
+#overlay.show #settings{ transform: scale(1); opacity:1; }
 #settings h3{ margin:0 0 4px; font-family:var(--font-display); font-size:18px; }
 #settings p{ margin:0 0 14px; font-size:13px; color:var(--text-1); line-height:1.5; }
 #settings label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-2); margin:14px 0 6px; }
@@ -285,12 +307,8 @@ html[data-theme="light"] #settings input{ background:#fff; }
 
 <div id="overlay">
   <div id="settings" class="glass">
-    <h3>Connect Supabase</h3>
-    <p>From Settings → API in your Supabase project. Stays on this device only.</p>
-    <label>Project URL</label>
-    <input id="in-url" placeholder="https://xxxx.supabase.co" autocomplete="off">
-    <label>Anon public key</label>
-    <input id="in-key" placeholder="eyJhbGciOi..." autocomplete="off">
+    <h3>Receiver location</h3>
+    <p>Used for the radar's distance/bearing math. Shared across every device — no need to set this more than once.</p>
     <label>Receiver location</label>
     <div class="split">
       <div><input id="in-lat" placeholder="Latitude" autocomplete="off"></div>
@@ -298,7 +316,7 @@ html[data-theme="light"] #settings input{ background:#fff; }
     </div>
     <div class="row">
       <button id="cancel-btn">Cancel</button>
-      <button id="save-btn">Connect</button>
+      <button id="save-btn">Save</button>
     </div>
     <div style="text-align:center;margin-top:12px;">
       <a href="#" id="auto-theme-link" style="font-size:12px;color:var(--text-2);text-decoration:underline;">Use automatic day/night theme</a>
@@ -346,10 +364,13 @@ document.querySelectorAll('.tab').forEach(tab => {
   };
 });
 
-let HOME = [
-  parseFloat(localStorage.getItem('sw-lat')) || 6.8481,
-  parseFloat(localStorage.getItem('sw-lon')) || 79.9265
-];
+// Anon public key — safe to expose client-side, protected by Row Level
+// Security policies in Supabase, not by secrecy. Every device loading
+// this file connects automatically, no per-device setup needed.
+const SUPABASE_URL = "https://ppsfxzwehqepkwvqwopi.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwc2Z4endlaHFlcGt3dnF3b3BpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1OTY4ODUsImV4cCI6MjEwMTE3Mjg4NX0.EDMWNq6GdivmNvHDGnVV5ySES6alvAA2mxsElHAib40";
+
+let HOME = [6.8481, 79.9265]; // overwritten once app_settings loads
 const MAX_RANGE_KM = 150;
 const RING_KMS = [50, 100, 150];
 
@@ -431,7 +452,20 @@ function buildRadarBase(){
   const home = document.createElementNS(svgNS,'circle');
   home.setAttribute('cx', CX); home.setAttribute('cy', CY); home.setAttribute('r', 3.2);
   home.setAttribute('class','home-dot');
+
+  const homePulse = document.createElementNS(svgNS,'circle');
+  homePulse.setAttribute('cx', CX); homePulse.setAttribute('cy', CY); homePulse.setAttribute('r', 3.2);
+  homePulse.setAttribute('class','home-pulse');
+  svg.appendChild(homePulse);
   svg.appendChild(home);
+
+  const sweep = document.createElementNS(svgNS,'path');
+  const a1 = toRad(28);
+  const sx = CX + R * Math.sin(a1), sy = CY - R * Math.cos(a1);
+  sweep.setAttribute('d', `M${CX},${CY} L${CX},${CY-R} A${R},${R} 0 0,1 ${sx},${sy} Z`);
+  sweep.setAttribute('fill', 'rgba(255,0,0,0.16)');
+  sweep.setAttribute('id', 'radar-sweep');
+  svg.appendChild(sweep);
 
   const group = document.createElementNS(svgNS,'g');
   group.setAttribute('id','plane-group');
@@ -455,7 +489,7 @@ function renderRadar(){
     const node = document.createElementNS(svgNS,'g');
     const isSelected = r.hex === selectedHex;
     node.setAttribute('class', 'plane-node' + (alert?' alert':'') + (isSelected?' selected':''));
-    node.setAttribute('transform', `translate(${x},${y})`);
+    node.style.transform = `translate(${x}px,${y}px)`;
     node.onclick = () => selectAircraft(r.hex);
 
     if(isSelected){
@@ -553,12 +587,15 @@ function removeRow(hex){
 }
 
 async function connect(){
-  const url = localStorage.getItem('sw-url');
-  const key = localStorage.getItem('sw-key');
-  if(!url || !key){ openSettings(); return; }
-
-  sb = supabase.createClient(url, key);
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   setStatus('warn');
+
+  const { data: settings } = await sb.from('app_settings').select('*').eq('id', 1).single();
+  if(settings){
+    HOME = [settings.home_lat, settings.home_lon];
+    renderRadar();
+    renderList();
+  }
 
   const { data, error } = await sb.from('aircraft_current').select('*');
   if(error){ setStatus('err'); console.error(error); return; }
@@ -601,8 +638,6 @@ async function loadHangar(){
 }
 
 function openSettings(){
-  document.getElementById('in-url').value = localStorage.getItem('sw-url') || '';
-  document.getElementById('in-key').value = localStorage.getItem('sw-key') || '';
   document.getElementById('in-lat').value = HOME[0];
   document.getElementById('in-lon').value = HOME[1];
   document.getElementById('overlay').classList.add('show');
@@ -610,23 +645,17 @@ function openSettings(){
 function closeSettings(){ document.getElementById('overlay').classList.remove('show'); }
 document.getElementById('settings-btn').onclick = openSettings;
 document.getElementById('cancel-btn').onclick = closeSettings;
-document.getElementById('save-btn').onclick = () => {
-  const url = document.getElementById('in-url').value.trim();
-  const key = document.getElementById('in-key').value.trim();
+document.getElementById('save-btn').onclick = async () => {
   const lat = parseFloat(document.getElementById('in-lat').value);
   const lon = parseFloat(document.getElementById('in-lon').value);
-  if(!url || !key) return;
-  localStorage.setItem('sw-url', url);
-  localStorage.setItem('sw-key', key);
-  if(!isNaN(lat) && !isNaN(lon)){
-    HOME = [lat, lon];
-    localStorage.setItem('sw-lat', lat);
-    localStorage.setItem('sw-lon', lon);
-  }
-  closeSettings();
+  if(isNaN(lat) || isNaN(lon)) return;
+  HOME = [lat, lon];
   renderRadar();
   renderList();
-  connect();
+  closeSettings();
+  if(sb){
+    await sb.from('app_settings').update({ home_lat: lat, home_lon: lon, updated_at: new Date().toISOString() }).eq('id', 1);
+  }
 };
 
 buildRadarBase();
