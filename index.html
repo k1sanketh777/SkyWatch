@@ -135,10 +135,11 @@ body{
 
 /* ---------- radar map ---------- */
 #radar-wrap{ flex:1; position:relative; min-height:0; overflow:hidden; }
-#radar-map{ position:absolute; inset:0; background:var(--bg-0); }
-.map-fade{ position:absolute; left:0; right:0; height:140px; pointer-events:none; z-index:400; }
-.map-fade-top{ top:0; background:linear-gradient(to bottom, var(--bg-0) 0%, transparent 100%); }
-.map-fade-bottom{ bottom:0; background:linear-gradient(to top, var(--bg-0) 0%, transparent 100%); }
+#radar-map{
+  position:absolute; inset:0; background:var(--bg-0);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 90px, black calc(100% - 90px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 90px, black calc(100% - 90px), transparent 100%);
+}
 .leaflet-container{ background:var(--bg-0); font-family:var(--font-body); }
 .leaflet-control-attribution{ display:none; }
 .leaflet-plane-divicon, .leaflet-home-divicon{ background:none; border:none; }
@@ -283,6 +284,14 @@ html[data-theme="light"] #settings input{ background:#fff; }
 #settings input:focus{ border-color: var(--accent-2); }
 .split{ display:flex; gap:10px; }
 .split > div{ flex:1; }
+.mode-btn{
+  flex:1; padding:10px; border-radius:10px; border:1px solid var(--glass-border);
+  background:var(--bg-0); color:var(--text-1); font-family:var(--font-body);
+  font-size:12px; font-weight:600; cursor:pointer; transition: all .15s ease;
+}
+html[data-theme="light"] .mode-btn{ background:#fff; }
+.mode-btn.active{ background:var(--accent-2); color:#fff; border-color:var(--accent-2); }
+.mode-btn:active{ transform: scale(.96); }
 #settings .row{ display:flex; gap:10px; margin-top:20px; }
 #settings button{
   flex:1; padding:11px; border-radius:10px; border:none; cursor:pointer;
@@ -311,8 +320,6 @@ html[data-theme="light"] #settings input{ background:#fff; }
     <div class="view active" id="view-radar">
       <div id="radar-wrap">
         <div id="radar-map"></div>
-        <div class="map-fade map-fade-top"></div>
-        <div class="map-fade map-fade-bottom"></div>
       </div>
       <div id="nearby">
         <div id="nearby-title">Nearby Aircraft</div>
@@ -374,6 +381,12 @@ html[data-theme="light"] #settings input{ background:#fff; }
       <div><input id="in-lat" placeholder="Latitude" autocomplete="off"></div>
       <div><input id="in-lon" placeholder="Longitude" autocomplete="off"></div>
     </div>
+    <label>Data source</label>
+    <div class="split">
+      <button type="button" id="mode-home-btn" class="mode-btn">My Receiver</button>
+      <button type="button" id="mode-world-btn" class="mode-btn">Worldwide</button>
+    </div>
+    <p style="margin:8px 0 0;font-size:11.5px;">Worldwide uses <a href="https://adsb.lol" target="_blank" rel="noopener" style="color:inherit;">adsb.lol</a>'s free public feed — much wider coverage than one receiver, but not your own data, and the Hangar only ever logs what your own receiver hears.</p>
     <div class="row">
       <button id="cancel-btn">Cancel</button>
       <button id="save-btn">Save</button>
@@ -619,7 +632,7 @@ function renderList(){
     .map(r => ({...r, _dist: distKm(HOME[0], HOME[1], r.lat, r.lon), _brg: bearing(HOME[0], HOME[1], r.lat, r.lon)}))
     .sort((a,b) => a._dist - b._dist);
 
-  document.getElementById('count').textContent = `${rows.length} aircraft`;
+  document.getElementById('count').textContent = `${rows.length} aircraft${dataMode === 'worldwide' ? ' · Worldwide' : ''}`;
 
   if(rows.length === 0){
     list.innerHTML = `<div id="empty">No aircraft in range right now.<br>Waiting for data from your receiver…</div>`;
@@ -690,24 +703,31 @@ function removeRow(hex){
   renderList();
 }
 
-async function connect(){
-  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  setStatus('warn');
+// ---------------- data source: home receiver vs worldwide ----------------
+let dataMode = localStorage.getItem('sw-mode') || 'home';
+let realtimeChannel = null;
+let worldwideTimer = null;
+const WORLDWIDE_POLL_MS = 6000;
+const WORLDWIDE_RADIUS_NM = 250; // adsb.lol's max per request
 
-  const { data: settings } = await sb.from('app_settings').select('*').eq('id', 1).single();
-  if(settings){
-    HOME = [settings.home_lat, settings.home_lon];
-    if(map){ map.setView(HOME, map.getZoom()); buildHomeMarker(); buildRings(); }
-    renderMapMarkers();
-    renderList();
-  }
+function stopHomeMode(){
+  if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+}
+function stopWorldwideMode(){
+  if(worldwideTimer){ clearInterval(worldwideTimer); worldwideTimer = null; }
+}
+
+async function startHomeMode(){
+  stopWorldwideMode();
+  aircraft.clear(); renderMapMarkers(); renderList();
+  setStatus('warn');
 
   const { data, error } = await sb.from('aircraft_current').select('*');
   if(error){ setStatus('err'); console.error(error); return; }
   data.forEach(applyRow);
   setStatus('ok');
 
-  sb.channel('aircraft-live')
+  realtimeChannel = sb.channel('aircraft-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'aircraft_current' }, payload => {
       if(payload.eventType === 'DELETE'){
         removeRow(payload.old.hex);
@@ -718,6 +738,69 @@ async function connect(){
     .subscribe(status => {
       setStatus(status === 'SUBSCRIBED' ? 'ok' : status === 'CHANNEL_ERROR' ? 'err' : 'warn');
     });
+}
+
+function normalizeWorldwide(ac){
+  if(ac.lat == null || ac.lon == null) return null;
+  let altitude = ac.alt_baro;
+  if(altitude === 'ground') altitude = 0;
+  if(typeof altitude !== 'number') altitude = null;
+  return {
+    hex: ac.hex, flight: (ac.flight || '').trim() || null,
+    lat: ac.lat, lon: ac.lon, altitude,
+    speed: ac.gs, track: ac.track, vertical_rate: ac.baro_rate, squawk: ac.squawk,
+  };
+}
+
+async function fetchWorldwide(){
+  try{
+    const res = await fetch(`https://api.adsb.lol/v2/point/${HOME[0]}/${HOME[1]}/${WORLDWIDE_RADIUS_NM}`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const rows = (data.ac || []).map(normalizeWorldwide).filter(Boolean);
+    const liveHexes = new Set(rows.map(r => r.hex));
+    [...aircraft.keys()].forEach(hex => { if(!liveHexes.has(hex)) removeRow(hex); });
+    rows.forEach(applyRow);
+    setStatus('ok');
+  } catch(e){
+    console.error('[worldwide]', e);
+    setStatus('err');
+  }
+}
+
+function startWorldwideMode(){
+  stopHomeMode();
+  aircraft.clear(); renderMapMarkers(); renderList();
+  setStatus('warn');
+  fetchWorldwide();
+  worldwideTimer = setInterval(fetchWorldwide, WORLDWIDE_POLL_MS);
+}
+
+function setDataMode(mode){
+  dataMode = mode;
+  localStorage.setItem('sw-mode', mode);
+  updateModeButtons();
+  if(mode === 'worldwide') startWorldwideMode(); else startHomeMode();
+}
+
+function updateModeButtons(){
+  document.getElementById('mode-home-btn').classList.toggle('active', dataMode === 'home');
+  document.getElementById('mode-world-btn').classList.toggle('active', dataMode === 'worldwide');
+}
+document.getElementById('mode-home-btn').onclick = () => setDataMode('home');
+document.getElementById('mode-world-btn').onclick = () => setDataMode('worldwide');
+
+async function connect(){
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  updateModeButtons();
+
+  const { data: settings } = await sb.from('app_settings').select('*').eq('id', 1).single();
+  if(settings){
+    HOME = [settings.home_lat, settings.home_lon];
+    if(map){ map.setView(HOME, map.getZoom()); buildHomeMarker(); buildRings(); }
+  }
+
+  if(dataMode === 'worldwide') startWorldwideMode(); else startHomeMode();
 }
 
 async function loadHangar(){
@@ -831,6 +914,7 @@ document.getElementById('save-btn').onclick = async () => {
   if(sb){
     await sb.from('app_settings').update({ home_lat: lat, home_lon: lon, updated_at: new Date().toISOString() }).eq('id', 1);
   }
+  if(dataMode === 'worldwide') fetchWorldwide();
 };
 
 buildMap();
