@@ -179,13 +179,17 @@ body{
 #hangar-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
 @media(min-width:640px){ #hangar-grid{ grid-template-columns: repeat(3, 1fr); } }
 @media(min-width:960px){ #hangar-grid{ grid-template-columns: repeat(4, 1fr); } }
-.hg-card{ padding:14px; display:flex; flex-direction:column; gap:8px; animation: riseIn .35s cubic-bezier(.2,.8,.2,1) both; transition: transform .15s ease; }
+.hg-card{ padding:0; display:flex; flex-direction:column; gap:0; overflow:hidden; animation: riseIn .35s cubic-bezier(.2,.8,.2,1) both; transition: transform .15s ease; }
 .hg-card:active{ transform: scale(.97); }
+.hg-photo{ width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:var(--glass-bg-strong); }
+.hg-body{ padding:12px 14px; display:flex; flex-direction:column; gap:6px; }
+.hg-credit{ font-family:var(--font-mono); font-size:9.5px; color:var(--text-2); }
+.hg-credit a{ color:inherit; }
 .hg-icon{ width:34px; height:34px; color:var(--accent); }
 .hg-icon svg{ width:100%; height:100%; }
 .hg-type{ font-family:var(--font-display); font-weight:600; font-size:13.5px; }
 .hg-reg{ font-family:var(--font-mono); font-size:11px; color:var(--text-2); }
-.hg-meta{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-2); margin-top:auto; padding-top:6px; border-top:1px solid var(--glass-border); }
+.hg-meta{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-2); margin-top:4px; padding-top:6px; border-top:1px solid var(--glass-border); }
 
 /* ---------- detail HUD card ---------- */
 #overlay-detail{ position:absolute; inset:0; z-index:1100; display:flex; align-items:flex-end; justify-content:center; padding:16px; opacity:0; pointer-events:none; transition: opacity .25s ease; }
@@ -370,7 +374,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 const SUPABASE_URL = "https://ppsfxzwehqepkwvqwopi.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwc2Z4endlaHFlcGt3dnF3b3BpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1OTY4ODUsImV4cCI6MjEwMTE3Mjg4NX0.EDMWNq6GdivmNvHDGnVV5ySES6alvAA2mxsElHAib40";
 
-let HOME = [7.1405, 79.8991]; // overwritten once app_settings loads
+let HOME = [6.8481, 79.9265]; // overwritten once app_settings loads
 const MAX_RANGE_KM = 150;
 const RING_KMS = [50, 100, 150];
 
@@ -627,12 +631,19 @@ async function loadHangar(){
   }
   grid.innerHTML = data.map(r => `
     <div class="hg-card glass">
-      <div class="hg-icon">${planeIcon()}</div>
-      <div>
+      ${r.photo_url
+        ? `<img class="hg-photo" src="${r.photo_url}" loading="lazy" alt="${r.registration || r.hex}">`
+        : `<div class="hg-photo" style="display:flex;align-items:center;justify-content:center;"><div class="hg-icon">${planeIcon()}</div></div>`
+      }
+      <div class="hg-body">
         <div class="hg-type">${typeName(r.type_code) || 'Unknown type'}</div>
         <div class="hg-reg">${r.registration || r.hex.toUpperCase()}</div>
+        <div class="hg-meta">seen ${r.times_seen}× · first ${new Date(r.first_seen).toLocaleDateString()}</div>
+        ${r.photo_photographer
+          ? `<div class="hg-credit">Photo: ${r.photo_photographer}${r.photo_link ? ` · <a href="${r.photo_link}" target="_blank" rel="noopener">planespotters.net</a>` : ''}</div>`
+          : ''
+        }
       </div>
-      <div class="hg-meta">seen ${r.times_seen}× · first ${new Date(r.first_seen).toLocaleDateString()}</div>
     </div>
   `).join('');
 }
