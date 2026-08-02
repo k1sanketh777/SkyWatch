@@ -88,9 +88,9 @@ body{
 
 /* ---------- top bar ---------- */
 #topbar{
-  flex:none; margin:16px 16px 0;
+  flex:none; margin:0; position:absolute; top:0; left:0; right:0;
   z-index:1000; display:flex; align-items:flex-start; gap:12px;
-  padding:14px 16px;
+  padding:16px;
 }
 #topbar-left{ display:flex; flex-direction:column; gap:3px; }
 #brand{ display:flex; align-items:center; gap:7px; font-family: var(--font-display); font-weight:700; font-size:18px; letter-spacing:0.2px; white-space:nowrap; }
@@ -136,6 +136,9 @@ body{
 /* ---------- radar map ---------- */
 #radar-wrap{ flex:1; position:relative; min-height:0; overflow:hidden; }
 #radar-map{ position:absolute; inset:0; background:var(--bg-0); }
+.map-fade{ position:absolute; left:0; right:0; height:140px; pointer-events:none; z-index:400; }
+.map-fade-top{ top:0; background:linear-gradient(to bottom, var(--bg-0) 0%, transparent 100%); }
+.map-fade-bottom{ bottom:0; background:linear-gradient(to top, var(--bg-0) 0%, transparent 100%); }
 .leaflet-container{ background:var(--bg-0); font-family:var(--font-body); }
 .leaflet-control-attribution{ display:none; }
 .leaflet-plane-divicon, .leaflet-home-divicon{ background:none; border:none; }
@@ -233,9 +236,9 @@ body{
 .hg-meta{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-2); margin-top:4px; padding-top:6px; border-top:1px solid var(--glass-border); }
 
 /* ---------- detail HUD card ---------- */
-#overlay-detail{ position:absolute; inset:0; z-index:1100; display:flex; align-items:flex-end; justify-content:center; padding:16px; opacity:0; pointer-events:none; transition: opacity .25s ease; }
+#overlay-detail{ position:absolute; inset:0; z-index:1100; display:flex; align-items:flex-end; justify-content:center; padding:0; opacity:0; pointer-events:none; transition: opacity .25s ease; }
 #overlay-detail.show{ opacity:1; pointer-events:auto; }
-#detail{ width:100%; max-width:420px; padding:18px 20px; transform: translateY(24px); transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+#detail{ width:100%; max-width:none; padding:20px 20px calc(20px + env(safe-area-inset-bottom, 0px)); border-radius: var(--radius) var(--radius) 0 0; transform: translateY(24px); transition: transform .3s cubic-bezier(.2,.8,.2,1); }
 #overlay-detail.show #detail{ transform: translateY(0); }
 #detail .close{ position:absolute; top:12px; right:12px; }
 #detail .flight{ font-family:var(--font-display); font-size:22px; font-weight:700; }
@@ -292,7 +295,7 @@ html[data-theme="light"] #settings input{ background:#fff; }
 <body>
 
 <div id="app">
-  <div id="topbar" class="glass">
+  <div id="topbar">
     <div id="topbar-left">
       <div id="brand"><span>SkyWatch</span><span class="dot" id="status-dot"></span></div>
       <div id="count">0 aircraft</div>
@@ -308,6 +311,8 @@ html[data-theme="light"] #settings input{ background:#fff; }
     <div class="view active" id="view-radar">
       <div id="radar-wrap">
         <div id="radar-map"></div>
+        <div class="map-fade map-fade-top"></div>
+        <div class="map-fade map-fade-bottom"></div>
       </div>
       <div id="nearby">
         <div id="nearby-title">Nearby Aircraft</div>
