@@ -181,9 +181,9 @@ body{
 @media(min-width:960px){ #hangar-grid{ grid-template-columns: repeat(4, 1fr); } }
 .hg-card{ padding:0; display:flex; flex-direction:column; gap:0; overflow:hidden; animation: riseIn .35s cubic-bezier(.2,.8,.2,1) both; transition: transform .15s ease; }
 .hg-card:active{ transform: scale(.97); }
-.hg-photo{ width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:var(--glass-bg-strong); }
+.hg-photo{ width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:var(--glass-bg-strong); transition: opacity .4s ease; }
 .hg-body{ padding:12px 14px; display:flex; flex-direction:column; gap:6px; }
-.hg-credit{ font-family:var(--font-mono); font-size:9.5px; color:var(--text-2); }
+.hg-credit{ font-family:var(--font-mono); font-size:9.5px; color:var(--text-2); transition: opacity .4s ease; }
 .hg-credit a{ color:inherit; }
 .hg-icon{ width:34px; height:34px; color:var(--accent); }
 .hg-icon svg{ width:100%; height:100%; }
@@ -629,24 +629,56 @@ async function loadHangar(){
     grid.innerHTML = `<div id="empty" style="grid-column:1/-1">Nothing logged yet — once the bridge script has been running a while, every distinct aircraft it hears will show up here.</div>`;
     return;
   }
-  grid.innerHTML = data.map(r => `
-    <div class="hg-card glass">
-      ${r.photo_url
-        ? `<img class="hg-photo" src="${r.photo_url}" loading="lazy" alt="${r.registration || r.hex}">`
+  grid.innerHTML = data.map(r => {
+    const photos = (r.photos && r.photos.length) ? r.photos : (r.photo_url ? [{url:r.photo_url, link:r.photo_link, photographer:r.photo_photographer}] : []);
+    const photosAttr = JSON.stringify(photos).replace(/'/g, '&#39;');
+    const first = photos[0];
+    return `
+    <div class="hg-card glass" ${photos.length ? `data-photos='${photosAttr}' data-idx="0"` : ''}>
+      ${first
+        ? `<img class="hg-photo" src="${first.url}" loading="lazy" alt="${r.registration || r.hex}">`
         : `<div class="hg-photo" style="display:flex;align-items:center;justify-content:center;"><div class="hg-icon">${planeIcon()}</div></div>`
       }
       <div class="hg-body">
         <div class="hg-type">${typeName(r.type_code) || 'Unknown type'}</div>
         <div class="hg-reg">${r.registration || r.hex.toUpperCase()}</div>
         <div class="hg-meta">seen ${r.times_seen}× · first ${new Date(r.first_seen).toLocaleDateString()}</div>
-        ${r.photo_photographer
-          ? `<div class="hg-credit">Photo: ${r.photo_photographer}${r.photo_link ? ` · <a href="${r.photo_link}" target="_blank" rel="noopener">planespotters.net</a>` : ''}</div>`
-          : ''
-        }
+        <div class="hg-credit">${first ? creditLine(first) : ''}</div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
+
+function creditLine(photo){
+  if(!photo || !photo.photographer) return '';
+  return `Photo: ${photo.photographer}${photo.link ? ` · <a href="${photo.link}" target="_blank" rel="noopener">planespotters.net</a>` : ''}`;
+}
+
+function cycleHangarPhotos(){
+  document.querySelectorAll('#hangar-grid .hg-card[data-photos]').forEach(card => {
+    let photos;
+    try { photos = JSON.parse(card.dataset.photos.replace(/&#39;/g, "'")); } catch { return; }
+    if(!photos || photos.length < 2) return;
+
+    const img = card.querySelector('.hg-photo');
+    const credit = card.querySelector('.hg-credit');
+    if(!img) return;
+
+    let idx = (parseInt(card.dataset.idx || '0', 10) + 1) % photos.length;
+    card.dataset.idx = idx;
+
+    img.style.opacity = '0';
+    if(credit) credit.style.opacity = '0';
+    setTimeout(() => {
+      img.src = photos[idx].url;
+      if(credit) credit.innerHTML = creditLine(photos[idx]);
+      img.style.opacity = '1';
+      if(credit) credit.style.opacity = '1';
+    }, 400);
+  });
+}
+setInterval(cycleHangarPhotos, 4000);
 
 function openSettings(){
   document.getElementById('in-lat').value = HOME[0];
