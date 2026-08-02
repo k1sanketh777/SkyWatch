@@ -12,6 +12,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
 <style>
 :root{
   --accent-2: #FF0000;
@@ -87,12 +89,13 @@ body{
 /* ---------- top bar ---------- */
 #topbar{
   flex:none; margin:16px 16px 0;
-  z-index:1000; display:flex; align-items:center; gap:12px;
-  padding:12px 16px;
+  z-index:1000; display:flex; align-items:flex-start; gap:12px;
+  padding:14px 16px;
 }
-#brand{ display:flex; align-items:center; gap:10px; font-family: var(--font-display); font-weight:700; font-size:17px; letter-spacing:0.2px; white-space:nowrap; }
+#topbar-left{ display:flex; flex-direction:column; gap:3px; }
+#brand{ display:flex; align-items:center; gap:7px; font-family: var(--font-display); font-weight:700; font-size:18px; letter-spacing:0.2px; white-space:nowrap; }
 #brand .dot{
-  width:9px; height:9px; border-radius:50%; background:var(--accent-2);
+  width:8px; height:8px; border-radius:50%; background:var(--accent-2);
   box-shadow:0 0 8px var(--accent-2);
   animation: pulse 2s ease-in-out infinite;
 }
@@ -101,9 +104,8 @@ body{
 @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:0.35} }
 
 #count{
-  font-family: var(--font-mono); font-size:13px; color:var(--text-1);
-  padding:4px 10px; border-radius:999px; background:var(--glass-bg-strong);
-  border:1px solid var(--glass-border);
+  font-family: var(--font-mono); font-size:12px; color:var(--text-2);
+  transition: opacity .3s ease;
 }
 .spacer{ flex:1; }
 .iconbtn{
@@ -131,25 +133,44 @@ body{
 }
 .view.active{ opacity:1; transform:translateY(0); pointer-events:auto; }
 
-/* ---------- radar ---------- */
-#radar-wrap{ flex:1; display:flex; align-items:center; justify-content:center; position:relative; padding:10px; min-height:0; }
-#radar-svg{ width:min(92vw, 62vh); height:min(92vw, 62vh); max-width:520px; max-height:520px; }
-.ring{ fill:none; stroke:var(--ring-color); stroke-width:1; }
-.ring-label{ fill:var(--ring-label); font-family:var(--font-mono); font-size:9px; }
-.compass-label{ fill:var(--text-2); font-family:var(--font-display); font-size:12px; font-weight:600; }
-.home-dot{ fill:var(--accent-2); }
-.home-pulse{ fill:none; stroke:var(--accent-2); stroke-width:1; animation: homepulse 2.4s ease-out infinite; }
-@keyframes homepulse{ 0%{ r:3.2; opacity:0.8; } 100%{ r:16; opacity:0; } }
-#radar-sweep{ transform-origin: 150px 150px; animation: sweep-rotate 4s linear infinite; pointer-events:none; }
-@keyframes sweep-rotate{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
-.plane-node{ cursor:pointer; transition: transform 1.6s linear; }
-.plane-node .glyph{ fill:var(--accent); transition: transform .6s ease; }
-.plane-node.selected .glyph{ fill:var(--accent-2); }
-.plane-node.alert .glyph{ fill:var(--accent-2); filter: drop-shadow(0 0 5px rgba(255,0,0,0.55)); animation: alertblink 1.1s ease-in-out infinite; }
+/* ---------- radar map ---------- */
+#radar-wrap{ flex:1; position:relative; min-height:0; overflow:hidden; }
+#radar-map{ position:absolute; inset:0; background:var(--bg-0); }
+.leaflet-container{ background:var(--bg-0); font-family:var(--font-body); }
+.leaflet-control-attribution{ display:none; }
+.leaflet-plane-divicon, .leaflet-home-divicon{ background:none; border:none; }
+
+.home-marker{ position:relative; width:0; height:0; }
+.home-marker .dot{ position:absolute; left:-4px; top:-4px; width:8px; height:8px; border-radius:50%; background:var(--accent-2); box-shadow:0 0 8px var(--accent-2); }
+.home-marker .pulse{ position:absolute; left:-4px; top:-4px; width:8px; height:8px; border-radius:50%; border:1.5px solid var(--accent-2); animation: homepulse 2.4s ease-out infinite; }
+@keyframes homepulse{ 0%{ transform:scale(1); opacity:0.8; } 100%{ transform:scale(4.5); opacity:0; } }
+
+.ring-label-marker{
+  font-family:var(--font-mono); font-size:9px; color:var(--ring-label);
+  white-space:nowrap; transform:translate(4px,-8px);
+}
+
+.plane-marker{ position:relative; width:0; height:0; cursor:pointer; }
+.plane-marker .pulse{
+  position:absolute; left:-9px; top:-9px; width:18px; height:18px; border-radius:50%;
+  border:1.2px solid var(--accent-2); opacity:0; animation: selectpulse 1.6s ease-out infinite;
+}
+.plane-marker.selected .pulse{ opacity:1; }
+@keyframes selectpulse{ 0%{ transform:scale(.4); opacity:0.7; } 100%{ transform:scale(2.2); opacity:0; } }
+.plane-marker svg{
+  position:absolute; left:-11px; top:-11px; width:22px; height:22px; overflow:visible;
+  filter: drop-shadow(var(--icon-shadow)); transition: transform .6s ease;
+}
+.plane-marker .glyph{ fill:var(--accent); }
+.plane-marker.selected .glyph{ fill:var(--accent-2); }
+.plane-marker.alert .glyph{ fill:var(--accent-2); animation: alertblink 1.1s ease-in-out infinite; }
 @keyframes alertblink{ 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
-.plane-node .label{ fill:var(--text-1); font-family:var(--font-mono); font-size:8.5px; }
-.radar-ring-pulse{ fill:none; stroke:var(--accent-2); stroke-width:1.2; opacity:0.6; animation: selectpulse 1.6s ease-out infinite; }
-@keyframes selectpulse{ 0%{ r:6; opacity:0.7; } 100%{ r:16; opacity:0; } }
+.plane-marker .label{
+  position:absolute; left:14px; top:-7px; white-space:nowrap;
+  font-family:var(--font-mono); font-size:10px; color:var(--text-0);
+  background:var(--glass-bg-strong); padding:1px 5px; border-radius:5px;
+  border:1px solid var(--glass-border);
+}
 
 /* ---------- nearby list under radar ---------- */
 #nearby{ flex:none; max-height:34vh; overflow-y:auto; padding:4px 16px 14px; }
@@ -173,13 +194,33 @@ body{
 
 /* ---------- hangar ---------- */
 #hangar{ flex:1; overflow-y:auto; padding:6px 16px 20px; }
-#hangar-title{ display:flex; align-items:baseline; justify-content:space-between; margin:10px 4px 14px; }
+#hangar-title{ display:flex; align-items:baseline; justify-content:space-between; margin:10px 4px 14px; gap:10px; }
 #hangar-title h2{ margin:0; font-family:var(--font-display); font-size:15px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:1px; }
-#hangar-title span{ font-family:var(--font-mono); font-size:12px; color:var(--text-2); }
+#hangar-title .right{ display:flex; align-items:center; gap:10px; }
+#hangar-count{ font-family:var(--font-mono); font-size:12px; color:var(--text-2); transition: opacity .3s ease; }
+#clear-hangar-btn{
+  font-family:var(--font-body); font-size:11px; font-weight:600; color:var(--accent-2);
+  background:none; border:1px solid var(--glass-border); border-radius:999px;
+  padding:5px 12px; cursor:pointer; transition: transform .15s ease, background .15s ease;
+}
+#clear-hangar-btn:hover{ background: var(--glass-bg-strong); }
+#clear-hangar-btn:active{ transform: scale(.94); }
+.hg-delete{
+  position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%;
+  background:rgba(0,0,0,0.45); backdrop-filter: blur(6px); border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; color:#fff;
+  opacity:0; transition: opacity .2s ease, transform .15s ease, background .15s ease;
+}
+.hg-card:hover .hg-delete, .hg-card:active .hg-delete{ opacity:1; }
+.hg-delete:hover{ background: var(--accent-2); }
+.hg-delete:active{ transform: scale(.88); }
+.hg-delete svg{ width:13px; height:13px; }
+.hg-card.removing{ animation: cardOut .3s ease forwards; }
+@keyframes cardOut{ to{ opacity:0; transform: scale(.9); } }
 #hangar-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
 @media(min-width:640px){ #hangar-grid{ grid-template-columns: repeat(3, 1fr); } }
 @media(min-width:960px){ #hangar-grid{ grid-template-columns: repeat(4, 1fr); } }
-.hg-card{ padding:0; display:flex; flex-direction:column; gap:0; overflow:hidden; animation: riseIn .35s cubic-bezier(.2,.8,.2,1) both; transition: transform .15s ease; }
+.hg-card{ padding:0; display:flex; flex-direction:column; gap:0; overflow:hidden; position:relative; animation: riseIn .4s cubic-bezier(.2,.8,.2,1) both; transition: transform .15s ease; }
 .hg-card:active{ transform: scale(.97); }
 .hg-photo{ width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:var(--glass-bg-strong); transition: opacity .4s ease; }
 .hg-body{ padding:12px 14px; display:flex; flex-direction:column; gap:6px; }
@@ -198,7 +239,8 @@ body{
 #overlay-detail.show #detail{ transform: translateY(0); }
 #detail .close{ position:absolute; top:12px; right:12px; }
 #detail .flight{ font-family:var(--font-display); font-size:22px; font-weight:700; }
-#detail .hexline{ font-family:var(--font-mono); font-size:12px; color:var(--text-2); margin-top:2px; }
+#detail .airline{ font-family:var(--font-body); font-size:13.5px; color:var(--text-1); margin-top:2px; }
+#detail .hexline{ font-family:var(--font-mono); font-size:11px; color:var(--text-2); margin-top:4px; }
 .hud-grid{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:14px; margin-top:16px; }
 .hud-stat label{ display:block; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--text-2); margin-bottom:3px; }
 .hud-stat .val{ font-family:var(--font-mono); font-size:19px; font-weight:600; color:var(--text-0); }
@@ -251,8 +293,10 @@ html[data-theme="light"] #settings input{ background:#fff; }
 
 <div id="app">
   <div id="topbar" class="glass">
-    <div id="brand"><span class="dot" id="status-dot"></span><span>Skywatch</span></div>
-    <div id="count">0 aircraft</div>
+    <div id="topbar-left">
+      <div id="brand"><span>SkyWatch</span><span class="dot" id="status-dot"></span></div>
+      <div id="count">0 aircraft</div>
+    </div>
     <div class="spacer"></div>
     <button class="iconbtn" id="theme-btn" title="Toggle theme"></button>
     <button class="iconbtn" id="settings-btn" title="Settings">
@@ -263,17 +307,23 @@ html[data-theme="light"] #settings input{ background:#fff; }
   <div id="views">
     <div class="view active" id="view-radar">
       <div id="radar-wrap">
-        <svg id="radar-svg" viewBox="0 0 300 300"></svg>
+        <div id="radar-map"></div>
       </div>
       <div id="nearby">
-        <div id="nearby-title">Nearby</div>
+        <div id="nearby-title">Nearby Aircraft</div>
         <div id="list"></div>
       </div>
     </div>
 
     <div class="view" id="view-hangar">
       <div id="hangar">
-        <div id="hangar-title"><h2>Hangar</h2><span id="hangar-count">0 aircraft logged</span></div>
+        <div id="hangar-title">
+          <h2>Hangar</h2>
+          <div class="right">
+            <span id="hangar-count">0 aircraft logged</span>
+            <button id="clear-hangar-btn">Clear all</button>
+          </div>
+        </div>
         <div id="hangar-grid"></div>
       </div>
     </div>
@@ -297,6 +347,7 @@ html[data-theme="light"] #settings input{ background:#fff; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
     <div class="flight" id="d-flight">—</div>
+    <div class="airline" id="d-airline"></div>
     <div class="hexline" id="d-hex">—</div>
     <div class="hud-grid">
       <div class="hud-stat"><label>Altitude</label><div class="val" id="d-alt">—</div></div>
@@ -328,6 +379,7 @@ html[data-theme="light"] #settings input{ background:#fff; }
   </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 const html = document.documentElement;
@@ -348,14 +400,16 @@ document.getElementById('theme-btn').onclick = () => {
   html.setAttribute('data-theme', next);
   localStorage.setItem('sw-theme', next);
   themeIcon();
-  renderRadar();
+  swapTiles();
+  buildRings();
 };
 document.getElementById('auto-theme-link').onclick = (e) => {
   e.preventDefault();
   localStorage.removeItem('sw-theme');
   html.setAttribute('data-theme', autoTheme());
   themeIcon();
-  renderRadar();
+  swapTiles();
+  buildRings();
 };
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -375,7 +429,6 @@ const SUPABASE_URL = "https://ppsfxzwehqepkwvqwopi.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwc2Z4endlaHFlcGt3dnF3b3BpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1OTY4ODUsImV4cCI6MjEwMTE3Mjg4NX0.EDMWNq6GdivmNvHDGnVV5ySES6alvAA2mxsElHAib40";
 
 let HOME = [6.8481, 79.9265]; // overwritten once app_settings loads
-const MAX_RANGE_KM = 150;
 const RING_KMS = [50, 100, 150];
 
 function toRad(d){ return d * Math.PI/180; }
@@ -414,6 +467,26 @@ const TYPE_NAMES = {
 };
 function typeName(code){ return (code && TYPE_NAMES[code]) || code || null; }
 
+const AIRLINE_NAMES = {
+  ALK:'SriLankan Airlines', FDB:'flydubai', UAE:'Emirates', QTR:'Qatar Airways',
+  ETH:'Ethiopian Airlines', SIA:'Singapore Airlines', CPA:'Cathay Pacific',
+  THA:'Thai Airways', MAS:'Malaysia Airlines', AIC:'Air India', IGO:'IndiGo',
+  GFA:'Gulf Air', KAC:'Kuwait Airways', SVA:'Saudia', MEA:'Middle East Airlines',
+  BAW:'British Airways', DLH:'Lufthansa', AFR:'Air France', KLM:'KLM',
+  UAL:'United Airlines', DAL:'Delta Air Lines', AAL:'American Airlines',
+  ANZ:'Air New Zealand', QFA:'Qantas', JAL:'Japan Airlines', ANA:'All Nippon Airways',
+  KAL:'Korean Air', CES:'China Eastern', CSN:'China Southern', CCA:'Air China',
+  HVN:'Vietnam Airlines', PAL:'Philippine Airlines', GIA:'Garuda Indonesia',
+  FIN:'Finnair', AUA:'Austrian Airlines', SWR:'Swiss Intl Air Lines', IBE:'Iberia',
+  TAP:'TAP Air Portugal', RYR:'Ryanair', EZY:'easyJet', WZZ:'Wizz Air',
+  ITY:'ITA Airways', LOT:'LOT Polish Airlines', AFL:'Aeroflot', TRA:'Transavia',
+};
+function parseAirline(flight){
+  if(!flight) return null;
+  const m = flight.match(/^[A-Z]{3}/);
+  return m ? (AIRLINE_NAMES[m[0]] || null) : null;
+}
+
 function planeSVG(){
   return `<path class="glyph" d="M12 2 9.5 9 2 12.2v1.8l7.5-2.3.6 5.6L7 19.5V21l5-1.3 5 1.3v-1.5l-3.1-2.2.6-5.6L22 14v-1.8L14.5 9z"/>`;
 }
@@ -423,98 +496,116 @@ function planeIcon(){
 
 const aircraft = new Map();
 let selectedHex = null;
+const markers = new Map(); // hex -> L.Marker
+let map, tileLayer, homeMarker, ringLayers = [], ringLabelMarkers = [];
 
-const svgNS = "http://www.w3.org/2000/svg";
-const CX = 150, CY = 150, R = 130;
+function cssVar(name){ return getComputedStyle(html).getPropertyValue(name).trim(); }
 
-function buildRadarBase(){
-  const svg = document.getElementById('radar-svg');
-  svg.innerHTML = '';
-  RING_KMS.forEach((km, i) => {
-    const r = R * (i+1)/RING_KMS.length;
-    const c = document.createElementNS(svgNS,'circle');
-    c.setAttribute('cx', CX); c.setAttribute('cy', CY); c.setAttribute('r', r);
-    c.setAttribute('class','ring');
-    svg.appendChild(c);
-    const t = document.createElementNS(svgNS,'text');
-    t.setAttribute('x', CX+4); t.setAttribute('y', CY - r + 10);
-    t.setAttribute('class','ring-label');
-    t.textContent = km + 'km';
-    svg.appendChild(t);
-  });
-  [['N',0],['E',90],['S',180],['W',270]].forEach(([label, deg]) => {
-    const rad = toRad(deg);
-    const x = CX + Math.sin(rad) * (R + 12);
-    const y = CY - Math.cos(rad) * (R + 12);
-    const t = document.createElementNS(svgNS,'text');
-    t.setAttribute('x', x); t.setAttribute('y', y+4);
-    t.setAttribute('text-anchor','middle');
-    t.setAttribute('class','compass-label');
-    t.textContent = label;
-    svg.appendChild(t);
-  });
-  const home = document.createElementNS(svgNS,'circle');
-  home.setAttribute('cx', CX); home.setAttribute('cy', CY); home.setAttribute('r', 3.2);
-  home.setAttribute('class','home-dot');
-
-  const homePulse = document.createElementNS(svgNS,'circle');
-  homePulse.setAttribute('cx', CX); homePulse.setAttribute('cy', CY); homePulse.setAttribute('r', 3.2);
-  homePulse.setAttribute('class','home-pulse');
-  svg.appendChild(homePulse);
-  svg.appendChild(home);
-
-  const sweep = document.createElementNS(svgNS,'path');
-  const a1 = toRad(28);
-  const sx = CX + R * Math.sin(a1), sy = CY - R * Math.cos(a1);
-  sweep.setAttribute('d', `M${CX},${CY} L${CX},${CY-R} A${R},${R} 0 0,1 ${sx},${sy} Z`);
-  sweep.setAttribute('fill', 'rgba(255,0,0,0.16)');
-  sweep.setAttribute('id', 'radar-sweep');
-  svg.appendChild(sweep);
-
-  const group = document.createElementNS(svgNS,'g');
-  group.setAttribute('id','plane-group');
-  svg.appendChild(group);
+function tileUrlForTheme(){
+  return html.getAttribute('data-theme') === 'dark'
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 }
 
-function renderRadar(){
-  const group = document.getElementById('plane-group');
-  if(!group) return;
-  group.innerHTML = '';
+function buildMap(){
+  map = L.map('radar-map', {
+    zoomControl:false, attributionControl:false,
+    dragging:false,                       // anchored to home — pinch/scroll to zoom, no panning away
+    touchZoom:'center', scrollWheelZoom:'center', doubleClickZoom:false,
+    boxZoom:false, keyboard:false, inertia:false,
+  }).setView(HOME, 10);
 
-  aircraft.forEach(r => {
-    const d = distKm(HOME[0], HOME[1], r.lat, r.lon);
-    const brg = bearing(HOME[0], HOME[1], r.lat, r.lon);
-    const rr = Math.min(d / MAX_RANGE_KM, 1) * R;
-    const rad = toRad(brg);
-    const x = CX + Math.sin(rad) * rr;
-    const y = CY - Math.cos(rad) * rr;
-    const alert = ['7500','7600','7700'].includes(r.squawk);
+  tileLayer = L.tileLayer(tileUrlForTheme(), { maxZoom:19, subdomains:'abcd' }).addTo(map);
 
-    const node = document.createElementNS(svgNS,'g');
-    const isSelected = r.hex === selectedHex;
-    node.setAttribute('class', 'plane-node' + (alert?' alert':'') + (isSelected?' selected':''));
-    node.style.transform = `translate(${x}px,${y}px)`;
-    node.onclick = () => selectAircraft(r.hex);
+  buildHomeMarker();
+  buildRings();
 
-    if(isSelected){
-      const pulse = document.createElementNS(svgNS,'circle');
-      pulse.setAttribute('r', 9); pulse.setAttribute('class','radar-ring-pulse');
-      node.appendChild(pulse);
-    }
-
-    const glyph = document.createElementNS(svgNS,'g');
-    glyph.setAttribute('transform', `scale(0.62) translate(-12,-12) rotate(${r.track||0} 12 12)`);
-    glyph.innerHTML = planeSVG();
-    node.appendChild(glyph);
-
-    const label = document.createElementNS(svgNS,'text');
-    label.setAttribute('class','label');
-    label.setAttribute('x', 8); label.setAttribute('y', -4);
-    label.textContent = r.flight || r.hex.toUpperCase();
-    node.appendChild(label);
-
-    group.appendChild(node);
+  // safety net: if a gesture ever nudges the center, snap back to home
+  map.on('moveend', () => {
+    if(map.getCenter().distanceTo(L.latLng(HOME)) > 5) map.panTo(HOME, { animate:false });
   });
+
+  setTimeout(() => map.invalidateSize(), 300);
+}
+
+function swapTiles(){
+  if(!map) return;
+  map.removeLayer(tileLayer);
+  tileLayer = L.tileLayer(tileUrlForTheme(), { maxZoom:19, subdomains:'abcd' }).addTo(map);
+}
+
+function buildHomeMarker(){
+  const icon = L.divIcon({
+    className: 'leaflet-home-divicon',
+    html: `<div class="home-marker"><div class="pulse"></div><div class="dot"></div></div>`,
+    iconSize:[0,0], iconAnchor:[0,0],
+  });
+  if(homeMarker) homeMarker.setLatLng(HOME);
+  else homeMarker = L.marker(HOME, { icon, interactive:false, zIndexOffset:500 }).addTo(map);
+}
+
+function destPoint(lat, lon, km, bearingDeg){
+  const dLat = km / 111.32;
+  const dLon = km / (111.32 * Math.cos(toRad(lat)));
+  const rad = toRad(bearingDeg);
+  return [lat + dLat * Math.cos(rad), lon + dLon * Math.sin(rad)];
+}
+
+function buildRings(){
+  if(!map) return;
+  ringLayers.forEach(l => map.removeLayer(l));
+  ringLabelMarkers.forEach(l => map.removeLayer(l));
+  ringLayers = []; ringLabelMarkers = [];
+
+  const ringColor = cssVar('--ring-color');
+  RING_KMS.forEach(km => {
+    const circle = L.circle(HOME, { radius: km*1000, color: ringColor, weight:1, fill:false, interactive:false }).addTo(map);
+    ringLayers.push(circle);
+
+    const [labLat, labLon] = destPoint(HOME[0], HOME[1], km, 0);
+    const label = L.marker([labLat, labLon], {
+      icon: L.divIcon({ className:'', html:`<div class="ring-label-marker">${km}km</div>`, iconSize:[0,0], iconAnchor:[0,0] }),
+      interactive:false,
+    }).addTo(map);
+    ringLabelMarkers.push(label);
+  });
+}
+
+function markerHTML(r, isSelected, isAlert){
+  const label = r.flight || r.hex.toUpperCase();
+  return `<div class="plane-marker${isAlert?' alert':''}${isSelected?' selected':''}">
+    <div class="pulse"></div>
+    <svg viewBox="0 0 24 24" style="transform:rotate(${r.track||0}deg)">${planeSVG()}</svg>
+    <div class="label">${label}</div>
+  </div>`;
+}
+
+function upsertMarker(r){
+  if(!map) return;
+  const isSelected = r.hex === selectedHex;
+  const isAlert = ['7500','7600','7700'].includes(r.squawk);
+  const icon = L.divIcon({ className:'leaflet-plane-divicon', html: markerHTML(r, isSelected, isAlert), iconSize:[0,0], iconAnchor:[0,0] });
+  let m = markers.get(r.hex);
+  if(m){
+    m.setLatLng([r.lat, r.lon]);
+    m.setIcon(icon);
+  } else {
+    m = L.marker([r.lat, r.lon], { icon, zIndexOffset:100 });
+    m.on('click', () => selectAircraft(r.hex));
+    m.addTo(map);
+    markers.set(r.hex, m);
+  }
+}
+
+function removeMarker(hex){
+  const m = markers.get(hex);
+  if(m){ map.removeLayer(m); markers.delete(hex); }
+}
+
+function renderMapMarkers(){
+  const liveHexes = new Set(aircraft.keys());
+  [...markers.keys()].forEach(hex => { if(!liveHexes.has(hex)) removeMarker(hex); });
+  aircraft.forEach(r => upsertMarker(r));
 }
 
 function renderList(){
@@ -550,6 +641,10 @@ function selectAircraft(hex){
   if(!r) return;
   document.getElementById('overlay-detail').classList.add('show');
   document.getElementById('d-flight').textContent = r.flight || 'Unknown';
+  const airlineEl = document.getElementById('d-airline');
+  const airline = parseAirline(r.flight);
+  airlineEl.textContent = airline || '';
+  airlineEl.style.display = airline ? 'block' : 'none';
   document.getElementById('d-hex').textContent = r.hex.toUpperCase();
   document.getElementById('d-alt').innerHTML = `${r.altitude ?? '—'}<span class="unit">ft</span>`;
   document.getElementById('d-speed').innerHTML = `${Math.round(r.speed||0)}<span class="unit">kt</span>`;
@@ -560,13 +655,13 @@ function selectAircraft(hex){
   sq.classList.toggle('squawk-alert', ['7500','7600','7700'].includes(r.squawk));
   const d = distKm(HOME[0], HOME[1], r.lat, r.lon);
   document.getElementById('d-dist').innerHTML = `${d.toFixed(0)}<span class="unit">km</span>`;
-  renderRadar();
+  renderMapMarkers();
   renderList();
 }
 function closeDetail(){
   selectedHex = null;
   document.getElementById('overlay-detail').classList.remove('show');
-  renderRadar();
+  renderMapMarkers();
   renderList();
 }
 document.getElementById('detail-close').onclick = closeDetail;
@@ -580,13 +675,13 @@ function setStatus(state){
 function applyRow(row){
   aircraft.set(row.hex, row);
   if(row.hex === selectedHex) selectAircraft(row.hex);
-  renderRadar();
+  renderMapMarkers();
   renderList();
 }
 function removeRow(hex){
   aircraft.delete(hex);
   if(selectedHex === hex) closeDetail();
-  renderRadar();
+  renderMapMarkers();
   renderList();
 }
 
@@ -597,7 +692,8 @@ async function connect(){
   const { data: settings } = await sb.from('app_settings').select('*').eq('id', 1).single();
   if(settings){
     HOME = [settings.home_lat, settings.home_lon];
-    renderRadar();
+    if(map){ map.setView(HOME, map.getZoom()); buildHomeMarker(); buildRings(); }
+    renderMapMarkers();
     renderList();
   }
 
@@ -629,12 +725,15 @@ async function loadHangar(){
     grid.innerHTML = `<div id="empty" style="grid-column:1/-1">Nothing logged yet — once the bridge script has been running a while, every distinct aircraft it hears will show up here.</div>`;
     return;
   }
-  grid.innerHTML = data.map(r => {
+  grid.innerHTML = data.map((r, i) => {
     const photos = (r.photos && r.photos.length) ? r.photos : (r.photo_url ? [{url:r.photo_url, link:r.photo_link, photographer:r.photo_photographer}] : []);
     const photosAttr = JSON.stringify(photos).replace(/'/g, '&#39;');
     const first = photos[0];
     return `
-    <div class="hg-card glass" ${photos.length ? `data-photos='${photosAttr}' data-idx="0"` : ''}>
+    <div class="hg-card glass" data-hex="${r.hex}" style="animation-delay:${Math.min(i,10)*40}ms" ${photos.length ? `data-photos='${photosAttr}' data-idx="0"` : ''}>
+      <button class="hg-delete" title="Remove from Hangar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
       ${first
         ? `<img class="hg-photo" src="${first.url}" loading="lazy" alt="${r.registration || r.hex}">`
         : `<div class="hg-photo" style="display:flex;align-items:center;justify-content:center;"><div class="hg-icon">${planeIcon()}</div></div>`
@@ -648,7 +747,34 @@ async function loadHangar(){
     </div>
   `;
   }).join('');
+
+  grid.querySelectorAll('.hg-delete').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const card = btn.closest('.hg-card');
+      const hex = card.dataset.hex;
+      if(!confirm('Remove this aircraft from the Hangar?')) return;
+      card.classList.add('removing');
+      await sb.from('aircraft_seen').delete().eq('hex', hex);
+      setTimeout(() => { card.remove(); updateHangarCount(); }, 300);
+    };
+  });
 }
+
+function updateHangarCount(){
+  const remaining = document.querySelectorAll('#hangar-grid .hg-card').length;
+  document.getElementById('hangar-count').textContent = `${remaining} aircraft logged`;
+}
+
+document.getElementById('clear-hangar-btn').onclick = async () => {
+  const cards = [...document.querySelectorAll('#hangar-grid .hg-card')];
+  if(cards.length === 0) return;
+  if(!confirm(`Clear all ${cards.length} aircraft from the Hangar? This can't be undone.`)) return;
+  const hexes = cards.map(c => c.dataset.hex);
+  cards.forEach((c, i) => setTimeout(() => c.classList.add('removing'), i * 25));
+  await sb.from('aircraft_seen').delete().in('hex', hexes);
+  setTimeout(loadHangar, cards.length * 25 + 350);
+};
 
 function creditLine(photo){
   if(!photo || !photo.photographer) return '';
@@ -693,7 +819,8 @@ document.getElementById('save-btn').onclick = async () => {
   const lon = parseFloat(document.getElementById('in-lon').value);
   if(isNaN(lat) || isNaN(lon)) return;
   HOME = [lat, lon];
-  renderRadar();
+  if(map){ map.setView(HOME, map.getZoom(), { animate:true }); buildHomeMarker(); buildRings(); }
+  renderMapMarkers();
   renderList();
   closeSettings();
   if(sb){
@@ -701,7 +828,7 @@ document.getElementById('save-btn').onclick = async () => {
   }
 };
 
-buildRadarBase();
+buildMap();
 connect();
 
 if('serviceWorker' in navigator){
