@@ -485,8 +485,8 @@ const SUPABASE_URL = "https://ppsfxzwehqepkwvqwopi.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwc2Z4endlaHFlcGt3dnF3b3BpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1OTY4ODUsImV4cCI6MjEwMTE3Mjg4NX0.EDMWNq6GdivmNvHDGnVV5ySES6alvAA2mxsElHAib40";
 
 let HOME = [6.8481, 79.9265]; // overwritten once app_settings loads
-const RING_NMS = [25, 50, 100];                  // nautical miles
-const RING_KMS = RING_NMS.map(nm => nm * 1.852); // km for Leaflet's radius param
+const RING_NMS = [25, 50, 100];
+const RING_KMS = RING_NMS.map(nm => nm * 1.852);
 
 function toRad(d){ return d * Math.PI/180; }
 function toDeg(r){ return r * 180/Math.PI; }
@@ -808,10 +808,10 @@ function drawSweep(){
   const pt = map.latLngToContainerPoint(L.latLng(HOME));
   const cx = pt.x, cy = pt.y;
 
-  // largest ring radius in pixels — project a point on the outermost ring
+  // sweep radius = exactly the outermost ring (100nm) in pixels
   const outerKm = RING_KMS[RING_KMS.length - 1];
   const edgePt = map.latLngToContainerPoint(L.latLng(HOME[0] + outerKm / 111.32, HOME[1]));
-  const sweepR = Math.abs(cy - edgePt.y) * 1.6; // a bit beyond the last ring
+  const sweepR = Math.abs(cy - edgePt.y);
 
   const arcSpan = Math.PI / 5; // 36° sweep arc
   const gradient = ctx.createConicalGradient
