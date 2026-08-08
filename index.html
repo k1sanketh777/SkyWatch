@@ -867,14 +867,16 @@ async function lookupRoute(callsign){
   const key = callsign.toUpperCase();
   if(routeCache.has(key)) return routeCache.get(key);
   try{
-    const r = await fetch(`https://hexdb.io/callsign-route?callsign=${key}`);
+    // adsbdb.com has proper CORS headers for browser-side requests
+    const r = await fetch(`https://api.adsbdb.com/v0/callsign/${key}`);
     if(!r.ok){ routeCache.set(key, null); return null; }
     const data = await r.json();
-    const route = (data.flightroute && data.flightroute.origin && data.flightroute.destination)
-      ? data.flightroute : null;
-    routeCache.set(key, route);
-    return route;
+    const route = data?.response?.flightroute;
+    const result = (route && route.origin && route.destination) ? route : null;
+    routeCache.set(key, result);
+    return result;
   } catch(e){
+    console.warn('[route]', callsign, e.message);
     routeCache.set(key, null);
     return null;
   }
@@ -891,6 +893,12 @@ function showRoute(route){
   document.getElementById('d-dest-iata').textContent = route.destination.iata_code || route.destination.icao_code || '—';
   document.getElementById('d-dest-name').textContent = route.destination.name || '';
   document.getElementById('d-dest-country').textContent = route.destination.country_name || '';
+  // if the API also returned an airline name, use it to fill the subtitle
+  if(route.airline?.name){
+    const airlineEl = document.getElementById('d-airline');
+    if(!airlineEl.textContent) airlineEl.textContent = route.airline.name;
+    airlineEl.style.display = 'block';
+  }
   section.classList.add('show');
 }
 
