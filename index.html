@@ -242,7 +242,6 @@ body{
   display:flex; align-items:flex-end; justify-content:center; padding:0;
   pointer-events:none;
 }
-#overlay-detail.show{ pointer-events:auto; }
 #detail{
   width:100%; max-width:none;
   padding:20px 20px calc(24px + env(safe-area-inset-bottom, 0px));
@@ -250,8 +249,9 @@ body{
   transform: translateY(110%);
   transition: transform .42s cubic-bezier(.32,1,.32,1);
   will-change: transform;
+  pointer-events:none;
 }
-#overlay-detail.show #detail{ transform: translateY(0); }
+#overlay-detail.show #detail{ transform: translateY(0); pointer-events:auto; }
 #detail .close{ position:absolute; top:12px; right:12px; }
 #detail .flight{ font-family:var(--font-display); font-size:22px; font-weight:700; }
 #detail .airline{ font-family:var(--font-body); font-size:13.5px; color:var(--text-1); margin-top:2px; }
@@ -582,6 +582,9 @@ function buildMap(){
     if(map.getCenter().distanceTo(L.latLng(HOME)) > 5) map.panTo(HOME, { animate:false });
   });
 
+  // close detail card when tapping the map (not a plane marker)
+  map.on('click', () => { if(selectedHex) closeDetail(); });
+
   setTimeout(() => { map.invalidateSize(); startSweep(); hookSweepToMap(); }, 300);
 }
 
@@ -648,7 +651,7 @@ function upsertMarker(r){
     m.setIcon(icon);
   } else {
     m = L.marker([r.lat, r.lon], { icon, zIndexOffset:100 });
-    m.on('click', () => selectAircraft(r.hex));
+    m.on('click', (e) => { L.DomEvent.stopPropagation(e); selectAircraft(r.hex); });
     m.addTo(map);
     markers.set(r.hex, m);
   }
