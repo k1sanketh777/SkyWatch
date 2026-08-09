@@ -196,7 +196,16 @@ body{
 
 #empty{ padding:26px 16px; text-align:center; color:var(--text-2); font-size:13px; line-height:1.6; }
 
-/* ---------- hangar ---------- */
+/* ---------- signal view ---------- */
+#signal-wrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; gap:16px; min-height:0; }
+#signal-canvas{ width:min(90vw, 70vh); height:min(90vw, 70vh); max-width:460px; max-height:460px; display:block; }
+#signal-info{ width:100%; max-width:460px; text-align:center; }
+#signal-title{ font-family:var(--font-display); font-size:15px; font-weight:600; color:var(--text-0); margin-bottom:4px; }
+#signal-sub{ font-family:var(--font-body); font-size:12px; color:var(--text-2); margin-bottom:12px; }
+#signal-stats{ display:flex; justify-content:center; gap:24px; }
+.sig-stat{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+.sig-stat .s-val{ font-family:var(--font-mono); font-size:17px; font-weight:600; color:var(--accent-2); }
+.sig-stat .s-label{ font-family:var(--font-mono); font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.5px; }
 #hangar{ flex:1; overflow-y:auto; padding:6px 16px 20px; }
 #hangar-title{ display:flex; align-items:baseline; justify-content:space-between; margin:10px 4px 14px; gap:10px; }
 #hangar-title h2{ margin:0; font-family:var(--font-display); font-size:15px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:1px; }
@@ -355,6 +364,17 @@ html[data-theme="light"] #settings .row{ background:#fff; }
       </div>
     </div>
 
+    <div class="view" id="view-signal">
+      <div id="signal-wrap">
+        <canvas id="signal-canvas"></canvas>
+        <div id="signal-info">
+          <div id="signal-title">Reception Coverage</div>
+          <div id="signal-sub">Shows max range heard per bearing from your receiver</div>
+          <div id="signal-stats"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="view" id="view-hangar">
       <div id="hangar">
         <div id="hangar-title">
@@ -373,6 +393,10 @@ html[data-theme="light"] #settings .row{ background:#fff; }
     <div class="tab active" data-view="radar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/></svg>
       <span>Radar</span>
+    </div>
+    <div class="tab" data-view="signal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12a10 10 0 1 0 20 0"/><path d="M5.5 12a6.5 6.5 0 1 0 13 0"/><path d="M9 12a3 3 0 1 0 6 0"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></svg>
+      <span>Signal</span>
     </div>
     <div class="tab" data-view="hangar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 16.5 12 4l9 12.5"/><path d="M5 14h14v6H5z"/><path d="M9 20v-3h6v3"/></svg>
@@ -475,6 +499,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.add('active');
     document.getElementById('view-' + tab.dataset.view).classList.add('active');
     if(tab.dataset.view === 'hangar') loadHangar();
+    if(tab.dataset.view === 'signal') setTimeout(refreshSignalView, 60);
   };
 });
 
@@ -752,6 +777,7 @@ function setStatus(state){
 
 function applyRow(row){
   aircraft.set(row.hex, row);
+  updateSignalFromAircraft(row);
   if(row.hex === selectedHex) selectAircraft(row.hex);
   renderMapMarkers();
   renderList();
@@ -900,6 +926,153 @@ function showRoute(route){
     airlineEl.style.display = 'block';
   }
   section.classList.add('show');
+}
+
+// ---------------- signal / coverage chart ----------------
+const BEARING_BUCKETS = 360; // one bucket per degree
+const signalMaxRange = new Float32Array(BEARING_BUCKETS); // max nm per degree
+let signalBuiltFromHistory = false;
+
+function updateSignalFromAircraft(r){
+  if(r.lat == null || r.lon == null) return;
+  const d = distKm(HOME[0], HOME[1], r.lat, r.lon) / 1.852; // nm
+  const b = Math.round(bearing(HOME[0], HOME[1], r.lat, r.lon)) % 360;
+  if(d > signalMaxRange[b]) signalMaxRange[b] = d;
+}
+
+async function buildSignalFromHistory(){
+  if(!sb || signalBuiltFromHistory) return;
+  // aircraft_seen doesn't have positions, so we only use live data
+  // but we can use aircraft_current for initial snapshot
+  signalBuiltFromHistory = true;
+}
+
+function drawSignalChart(){
+  const canvas = document.getElementById('signal-canvas');
+  if(!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const size = canvas.offsetWidth;
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const cx = size / 2, cy = size / 2;
+  const maxR = size * 0.42;
+
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  const ringCol = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+  const labelCol = isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.3)';
+  const compassCol = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
+
+  ctx.clearRect(0, 0, size, size);
+
+  // find actual max range for scaling
+  let maxNm = 0;
+  for(let i = 0; i < BEARING_BUCKETS; i++) if(signalMaxRange[i] > maxNm) maxNm = signalMaxRange[i];
+  const scaleNm = maxNm > 0 ? Math.ceil(maxNm / 25) * 25 : 100; // round up to nearest 25nm
+
+  // range rings
+  const ringSteps = [0.25, 0.5, 0.75, 1.0];
+  ringSteps.forEach(frac => {
+    const r = maxR * frac;
+    const nm = Math.round(scaleNm * frac);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = ringCol;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = labelCol;
+    ctx.font = `${Math.round(size * 0.022)}px JetBrains Mono, monospace`;
+    ctx.fillText(`${nm}nm`, cx + 4, cy - r + size * 0.028);
+  });
+
+  // compass labels
+  const compass = [['N',0],['E',90],['S',180],['W',270]];
+  compass.forEach(([lbl, deg]) => {
+    const rad = (deg - 90) * Math.PI / 180;
+    const tx = cx + (maxR + size * 0.055) * Math.cos(rad);
+    const ty = cy + (maxR + size * 0.055) * Math.sin(rad);
+    ctx.fillStyle = compassCol;
+    ctx.font = `600 ${Math.round(size * 0.032)}px Space Grotesk, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(lbl, tx, ty);
+  });
+
+  if(maxNm === 0){
+    // no data yet
+    ctx.fillStyle = labelCol;
+    ctx.font = `${Math.round(size * 0.03)}px Inter, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Waiting for aircraft data…', cx, cy);
+    return;
+  }
+
+  // filled polar area — main shape
+  ctx.beginPath();
+  let started = false;
+  for(let i = 0; i < BEARING_BUCKETS; i++){
+    const angle = (i - 90) * Math.PI / 180;
+    const nm = signalMaxRange[i];
+    const r = nm > 0 ? (nm / scaleNm) * maxR : 2;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    if(!started){ ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+  }
+  ctx.closePath();
+
+  // red gradient fill
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
+  grad.addColorStop(0,   'rgba(255,0,0,0.35)');
+  grad.addColorStop(0.6, 'rgba(255,0,0,0.18)');
+  grad.addColorStop(1,   'rgba(255,0,0,0.05)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // outline stroke
+  ctx.strokeStyle = 'rgba(255,0,0,0.7)';
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  // gaps (bearings with no data) — overlay a thin grey spoke
+  for(let i = 0; i < BEARING_BUCKETS; i++){
+    if(signalMaxRange[i] === 0){
+      const angle = (i - 90) * Math.PI / 180;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + maxR * Math.cos(angle), cy + maxR * Math.sin(angle));
+      ctx.strokeStyle = isDark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+    }
+  }
+
+  // home dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#FF0000';
+  ctx.fill();
+
+  // stats
+  let coveredDegrees = 0;
+  for(let i = 0; i < BEARING_BUCKETS; i++) if(signalMaxRange[i] > 0) coveredDegrees++;
+  const avgNm = coveredDegrees > 0
+    ? Array.from(signalMaxRange).filter(v => v > 0).reduce((a,b) => a+b, 0) / coveredDegrees
+    : 0;
+
+  document.getElementById('signal-stats').innerHTML = `
+    <div class="sig-stat"><div class="s-val">${Math.round(maxNm)}<span style="font-size:11px;color:var(--text-1)">nm</span></div><div class="s-label">Max Range</div></div>
+    <div class="sig-stat"><div class="s-val">${Math.round(avgNm)}<span style="font-size:11px;color:var(--text-1)">nm</span></div><div class="s-label">Avg Range</div></div>
+    <div class="sig-stat"><div class="s-val">${Math.round(coveredDegrees/3.6)}<span style="font-size:11px;color:var(--text-1)">%</span></div><div class="s-label">Coverage</div></div>
+  `;
+}
+
+function refreshSignalView(){
+  // rebuild from all currently known live aircraft
+  signalMaxRange.fill(0);
+  aircraft.forEach(r => updateSignalFromAircraft(r));
+  drawSignalChart();
 }
 
 async function loadHangar(){
