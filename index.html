@@ -1009,16 +1009,29 @@ function drawSignalChart(){
     return;
   }
 
-  // filled polar area — main shape
+  // smooth polar area using cardinal spline through all 360 points
   ctx.beginPath();
-  let started = false;
+  const points = [];
   for(let i = 0; i < BEARING_BUCKETS; i++){
     const angle = (i - 90) * Math.PI / 180;
     const nm = signalMaxRange[i];
-    const r = nm > 0 ? (nm / scaleNm) * maxR : 2;
-    const x = cx + r * Math.cos(angle);
-    const y = cy + r * Math.sin(angle);
-    if(!started){ ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+    const r = nm > 0 ? (nm / scaleNm) * maxR : 3;
+    points.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+  }
+
+  // cardinal spline — smooth curve through all points
+  const tension = 0.4;
+  ctx.moveTo(points[0][0], points[0][1]);
+  for(let i = 0; i < points.length; i++){
+    const p0 = points[(i - 1 + points.length) % points.length];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % points.length];
+    const p3 = points[(i + 2) % points.length];
+    const cp1x = p1[0] + (p2[0] - p0[0]) * tension / 2;
+    const cp1y = p1[1] + (p2[1] - p0[1]) * tension / 2;
+    const cp2x = p2[0] - (p3[0] - p1[0]) * tension / 2;
+    const cp2y = p2[1] - (p3[1] - p1[1]) * tension / 2;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2[0], p2[1]);
   }
   ctx.closePath();
 
@@ -1034,19 +1047,6 @@ function drawSignalChart(){
   ctx.strokeStyle = 'rgba(255,0,0,0.7)';
   ctx.lineWidth = 1.4;
   ctx.stroke();
-
-  // gaps (bearings with no data) — overlay a thin grey spoke
-  for(let i = 0; i < BEARING_BUCKETS; i++){
-    if(signalMaxRange[i] === 0){
-      const angle = (i - 90) * Math.PI / 180;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + maxR * Math.cos(angle), cy + maxR * Math.sin(angle));
-      ctx.strokeStyle = isDark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.5)';
-      ctx.lineWidth = 0.7;
-      ctx.stroke();
-    }
-  }
 
   // home dot
   ctx.beginPath();
