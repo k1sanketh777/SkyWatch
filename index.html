@@ -1068,9 +1068,23 @@ function drawSignalChart(){
   `;
 }
 
-function refreshSignalView(){
-  // rebuild from all currently known live aircraft
-  signalMaxRange.fill(0);
+let signalHistoryLoaded = false;
+
+async function loadSignalHistory(){
+  if(!sb || signalHistoryLoaded) return;
+  const { data, error } = await sb.from('signal_coverage').select('bearing,max_nm').gt('max_nm', 0);
+  if(error){ console.error('[signal]', error); return; }
+  signalHistoryLoaded = true;
+  data.forEach(row => {
+    if(row.max_nm > signalMaxRange[row.bearing])
+      signalMaxRange[row.bearing] = row.max_nm;
+  });
+  console.log(`[signal] loaded ${data.length} historical bearing buckets`);
+}
+
+async function refreshSignalView(){
+  await loadSignalHistory();
+  // merge in any live aircraft not yet flushed to Supabase by the bridge
   aircraft.forEach(r => updateSignalFromAircraft(r));
   drawSignalChart();
 }
