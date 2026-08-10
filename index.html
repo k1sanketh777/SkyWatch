@@ -926,13 +926,16 @@ function countryFlag(countryName){
 
 async function lookupRoute(callsign){
   if(!callsign) return null;
-  const key = callsign.toUpperCase();
+  const key = callsign.toUpperCase().trim();
   if(routeCache.has(key)) return routeCache.get(key);
   try{
-    // adsbdb.com has proper CORS headers for browser-side requests
-    const r = await fetch(`https://api.adsbdb.com/v0/callsign/${key}`);
+    const url = `https://api.adsbdb.com/v0/callsign/${key}`;
+    console.log('[route] fetching:', url);
+    const r = await fetch(url);
+    console.log('[route] status:', r.status);
     if(!r.ok){ routeCache.set(key, null); return null; }
     const data = await r.json();
+    console.log('[route] response:', JSON.stringify(data).slice(0, 300));
     const route = data?.response?.flightroute;
     const result = (route && route.origin && route.destination) ? route : null;
     routeCache.set(key, result);
@@ -1249,3 +1252,4 @@ if('serviceWorker' in navigator){
 </script>
 </body>
 </html>
+
