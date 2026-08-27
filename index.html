@@ -140,6 +140,9 @@ body{
 #radar-map{
   position:absolute; inset:0; background:var(--bg-0);
 }
+html[data-theme="dark"] #radar-map .leaflet-tile-pane{
+  filter: invert(1) hue-rotate(180deg) brightness(0.7) contrast(1.1) saturate(0.3);
+}
 /* gradient overlays sit above the map but below markers and UI */
 #radar-wrap::before{
   content:''; position:absolute; inset:0; z-index:300; pointer-events:none;
@@ -600,9 +603,11 @@ let map, tileLayer, homeMarker, ringLayers = [], ringLabelMarkers = [];
 function cssVar(name){ return getComputedStyle(html).getPropertyValue(name).trim(); }
 
 function tileUrlForTheme(){
+  // OpenStreetMap — free, no key, works everywhere
+  // Dark mode uses a dark-styled variant from OSM
   return html.getAttribute('data-theme') === 'dark'
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 }
 
 function buildMap(){
@@ -613,7 +618,7 @@ function buildMap(){
     boxZoom:false, keyboard:false, inertia:false,
   }).setView(HOME, 10);
 
-  tileLayer = L.tileLayer(tileUrlForTheme(), { maxZoom:19, subdomains:'abcd' }).addTo(map);
+  tileLayer = L.tileLayer(tileUrlForTheme(), { maxZoom:19, subdomains:'abc' }).addTo(map);
 
   buildHomeMarker();
   buildRings();
@@ -627,7 +632,7 @@ function buildMap(){
 function swapTiles(){
   if(!map) return;
   map.removeLayer(tileLayer);
-  tileLayer = L.tileLayer(tileUrlForTheme(), { maxZoom:19, subdomains:'abcd' }).addTo(map);
+  tileLayer = L.tileLayer(tileUrlForTheme(), { maxZoom:19, subdomains:'abc' }).addTo(map);
 }
 
 function buildHomeMarker(){
