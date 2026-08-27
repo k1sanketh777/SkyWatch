@@ -139,8 +139,15 @@ body{
 #radar-wrap{ flex:1; position:relative; min-height:0; overflow:hidden; }
 #radar-map{
   position:absolute; inset:0; background:var(--bg-0);
-  -webkit-mask-image: radial-gradient(ellipse 85% 80% at 50% 50%, black 40%, transparent 100%);
-  mask-image: radial-gradient(ellipse 85% 80% at 50% 50%, black 40%, transparent 100%);
+}
+/* gradient overlays sit above the map but below markers and UI */
+#radar-wrap::before{
+  content:''; position:absolute; inset:0; z-index:300; pointer-events:none;
+  background: radial-gradient(ellipse 90% 85% at 50% 50%, transparent 35%, var(--bg-0) 100%);
+}
+#radar-wrap::after{
+  content:''; position:absolute; left:0; right:0; top:0; height:160px; z-index:300; pointer-events:none;
+  background: linear-gradient(to bottom, var(--bg-0) 0%, transparent 100%);
 }
 .leaflet-container{ background:var(--bg-0); font-family:var(--font-body); }
 .leaflet-control-attribution{ display:none; }
@@ -296,8 +303,6 @@ body{
 .hud-stat label{ display:block; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--text-2); margin-bottom:3px; }
 .hud-stat .val{ font-family:var(--font-mono); font-size:19px; font-weight:600; color:var(--text-0); transition: color .3s ease; }
 .hud-stat .val .unit{ font-size:11px; color:var(--text-1); font-weight:400; margin-left:2px; }
-.hud-stat .val.updated{ animation: statPop .3s cubic-bezier(.2,.8,.2,1); }
-@keyframes statPop{ 0%{ transform:scale(1.12); } 100%{ transform:scale(1); } }
 .squawk-alert{ color:var(--accent-2) !important; }
 
 /* ---------- bottom tab bar ---------- */
@@ -810,17 +815,6 @@ function showRoute(route){
   section.classList.add('show');
 }
 
-function setVal(id, html){
-  const el = document.getElementById(id);
-  if(!el) return;
-  if(el.innerHTML !== html){
-    el.innerHTML = html;
-    el.classList.remove('updated');
-    void el.offsetWidth; // reflow to restart animation
-    el.classList.add('updated');
-  }
-}
-
 function selectAircraft(hex){
   selectedHex = hex;
   const r = aircraft.get(hex);
@@ -832,10 +826,10 @@ function selectAircraft(hex){
   airlineEl.textContent = airline || '';
   airlineEl.style.display = airline ? 'block' : 'none';
   document.getElementById('d-hex').textContent = r.hex.toUpperCase();
-  setVal('d-alt',   `${r.altitude ?? '—'}<span class="unit">ft</span>`);
-  setVal('d-speed', `${Math.round(r.speed||0)}<span class="unit">kt</span>`);
-  setVal('d-track', `${Math.round(r.track||0)}<span class="unit">°</span>`);
-  setVal('d-vs',    `${r.vertical_rate ?? 0}<span class="unit">fpm</span>`);
+  document.getElementById('d-alt').innerHTML   = `${r.altitude ?? '—'}<span class="unit">ft</span>`;
+  document.getElementById('d-speed').innerHTML = `${Math.round(r.speed||0)}<span class="unit">kt</span>`;
+  document.getElementById('d-track').innerHTML = `${Math.round(r.track||0)}<span class="unit">°</span>`;
+  document.getElementById('d-vs').innerHTML    = `${r.vertical_rate ?? 0}<span class="unit">fpm</span>`;
   const sq = document.getElementById('d-squawk');
   sq.textContent = r.squawk || '—';
   sq.classList.toggle('squawk-alert', ['7500','7600','7700'].includes(r.squawk));
@@ -943,33 +937,31 @@ function drawSweep(){
   const edgePt = map.latLngToContainerPoint(L.latLng(HOME[0] + outerKm / 111.32, HOME[1]));
   const sweepR = Math.abs(cy - edgePt.y);
 
-  const arcSpan = Math.PI / 5; // 36° sweep arc
-  const gradient = ctx.createConicalGradient
-    ? null  // createConicalGradient not widely available — use arc fill instead
-    : null;
+  const arcSpan = Math.PI / 5; // 36° trail behind the leading line
 
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(cx, cy);
-  ctx.arc(cx, cy, sweepR, sweepAngle, sweepAngle + arcSpan);
+  // arc goes BEHIND the leading line: from (sweepAngle - arcSpan) to sweepAngle
+  ctx.arc(cx, cy, sweepR, sweepAngle - arcSpan, sweepAngle);
   ctx.closePath();
 
-  // fade from transparent at leading edge to red at trailing edge
+  // fade from red at the leading edge (sweepAngle) to transparent at the trailing end
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sweepR);
-  grad.addColorStop(0,   'rgba(255,0,0,0)');
-  grad.addColorStop(0.3, 'rgba(255,0,0,0.04)');
+  grad.addColorStop(0,   'rgba(255,0,0,0.12)');
+  grad.addColorStop(0.5, 'rgba(255,0,0,0.10)');
   grad.addColorStop(1,   'rgba(255,0,0,0.18)');
   ctx.fillStyle = grad;
   ctx.fill();
   ctx.restore();
 
-  // bright leading edge line
+  // bright leading edge line — drawn last so it sits on top of the trail
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx + sweepR * Math.cos(sweepAngle), cy + sweepR * Math.sin(sweepAngle));
-  ctx.strokeStyle = 'rgba(255,0,0,0.55)';
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = 'rgba(255,0,0,0.7)';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
 }
